@@ -53,7 +53,7 @@ df %<>% mutate(season = case_when(
   q3==1 ~ 3,
   q4==4 ~ 4))
 df$season %<>% as.factor()
-df %>% count(season)
+#df %>% count(season)
 ```
 
 1) Present and discuss summary statistics of the data. Show and describe the following relationships: (a) per capita consumption of roasted cofee and the price of roasted coffee, (b) consumption of roasted coffee and price of tea, (c) price of roasted coffee and price of labor, (d) price of roasted coffee and price of tea. `Comment if you observe any clear time trends.

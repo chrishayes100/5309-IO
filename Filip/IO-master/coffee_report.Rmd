@@ -1,0 +1,265 @@
+---
+title: "Empirical Workshop 1"
+author: "Filip Mellgren"
+date: '2019-04-02'
+output:
+  word_document: default
+  pdf_document: default
+  html_document:
+    code_folding: hide
+    df_print: kable
+    highlight: zenburn
+    theme: readable
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warnings = FALSE)
+```
+
+```{r, message=FALSE}
+library(rio)
+library(tidyverse)
+library(AER)
+library(ggthemes)
+library(stargazer)
+```
+```{r}
+df <- import("dutch_coffee.dta")
+```
+```{r}
+
+df %>% head()
+```
+```{r}
+# Create time variable
+df <- df %>% mutate(time = year + month/12)
+```
+## Summary statistics
+
+Present and discuss summary statistics of the data. Show and describe the following relationships: (a) per capita consumption of roasted coffee and the price of roasted coffee, (b) consumption of roasted coffee and price of tea, (c) price of roasted coffee and price of labor, (d) price of roasted coffee and price of tea. Comment if you observe any clear time trends.
+
+### Summary Table
+```{r}
+#summary(df$cprice)
+sapply(select(df, cprice, tprice, wprice, qu), summary)
+```
+
+
+### Per capita consumption of roasted coffe and price of roasted coffee
+```{r}
+# descriptives are important!
+# Plot all the time series in separate graphs
+# a) per capita consumption of roasted coffee and price of roasted coffee
+df %>% ggplot(aes(x = time, y = qu)) +
+  geom_line() +
+  labs(y = "Quantity", x = "Year", title = "Per capita consumption of roasted coffee")
+
+df %>% ggplot(aes(x = time, y = cprice)) +
+  geom_line() +
+  theme_economist() + scale_colour_economist() +
+  labs(y = "Price", x = "Year", title = "Price of roasted coffee")
+```
+
+```{r}
+# Coffee and tea and quantity indexed
+df <- df %>% mutate("price roasted coffee" = cprice/cprice[1]*100,
+              "price tea" = tprice/tprice[1]*100,
+              "pc roasted coffee consumption" = qu/qu[1]*100,
+              "price coffee beans" = bprice/bprice[1]*100) 
+
+df %>% gather(`price roasted coffee`, `price tea`, `pc roasted coffee consumption`, key = "index", value = "price") %>% 
+  ggplot(aes(x = time, y = price, color = index )) +
+  geom_line() +
+  theme_economist() + scale_colour_economist() +
+  labs(y = "Indexed price and consumption", x = "Year", title = "No obvious correlations")
+```
+```{r}
+# Calculate correlations
+cor(df$cprice, df$tprice)
+cor(df$cprice, df$qu)
+cor(df$tprice, df$qu)
+```
+```{r}
+df %>% gather(`price roasted coffee`, `price coffee beans`, key = "index", value = "price") %>% 
+  ggplot(aes(x = time, y = price, color = index )) +
+  geom_line() +
+  theme_economist() + scale_colour_economist() +
+  labs(y = "Indexed price", x = "Year", title = "Roasted coffee prices depend heavily on bean prices")
+```
+
+### Consumption of roasted coffee and price of tea
+```{r}
+# consumption of roasted coffee and price of tea
+df %>% ggplot(aes(x = time, y = tprice)) +
+  geom_line() +
+  labs(y = "Price", x = "Year", title = "Price of tea")
+
+```
+
+
+
+### c and d
+```{r}
+df <- df %>% mutate("roasted coffee" = cprice/cprice[1]*100,
+              tea = tprice/tprice[1]*100,
+              wages = wprice/wprice[1]*100) 
+
+df %>% gather(`roasted coffee`, tea, wages, key = "Index", value = "price") %>% 
+  ggplot(aes(x = time, y = price, color = Index)) +
+  geom_line() +
+  theme_economist() + scale_colour_economist() + 
+  labs(y = "Indexed price", x = "Year", 
+       title = "Coffee price jitters: wages and tea prices unaffected")
+```
+
+```{r}
+
+```
+```{r}
+# price of roasted coffee and price of labor
+df %>% ggplot(aes(x = time, y = wprice)) +
+  geom_line() +
+  labs(y = "Price", x = "Year", title = "Wages over time")
+
+```
+```{r}
+# price of roasted coffee and price of tea
+
+```
+## Regress
+```{r}
+df <- df %>% mutate(cprice = cprice / oprice,
+              wprice = wprice / oprice,
+              tprice = tprice / oprice)
+
+no_controls <- lm(log(qu) ~ log(cprice), data = df)
+quarter_controls <- lm(log(qu) ~ log(cprice) + q1 + q2 + q3, data = df)
+```
+
+```{r results="asis"}
+stargazer(no_controls, quarter_controls, header = FALSE)
+```
+
+## Supply and demand shifts
+Start from the data that we have.
+
+Valid instrument, corr(zx) > 0, E(z epsilon) = 0.
+How to find instruments? 
+
+Supply shift: wages, prices of beans
+
+Demand shift: 
+
+
+## Log linear demand estimation
+$log(Q) = \beta_0 + \beta_1 log(P) + \varepsilon$
+
+$Q = e^{\beta_0 + \beta_1 log(P) + \varepsilon}$
+
+$\beta_1 = \frac{dQ}{dP}\frac{P}$
+
+```{r}
+tea_control <- lm(log(qu) ~log(cprice) + q1 + q2 + q3 + log(tprice), data = df)
+income_control <- lm(log(qu) ~log(cprice) + q1 + q2 + q3 + log(tprice) +
+                       log(incom), data = df)
+
+# seasonal controls summary
+stargazer(no_controls, quarter_controls, tea_control, income_control, 
+          header = FALSE, type = "text")
+```
+
+
+## One major concern
+
+ivreg
+```{r}
+IV_spec <- ivreg(log(qu) ~ log(cprice) + q1 + q2 + q3 + log(tprice) +
+                       log(incom) | q1 + q2 + q3 + log(tprice) +
+                       log(incom) + log(bprice) + log(wprice), data = df)
+
+stargazer(IV_spec, income_control, header = FALSE, type = "text")
+summary(IV_spec, diagnostics = TRUE)
+```
+
+## Degree of competition in the Dutch coffee market
+```{r}
+c0 = 4
+h = 1.19
+df <- df %>% mutate(c = c0 + h*bprice) # we know the cost already
+```
+
+### Lerner index
+$L = \frac{P-c}{P}$
+```{r}
+df <- df %>% mutate(L = (cprice - c)/cprice)
+```
+
+
+### Adjusted Lerner index
+
+$L_\eta = \frac{P-c}{P} \hat{\eta}$
+
+```{r}
+eta = -0.27737 # The price elastsicity of demand from the IV
+df <- df %>% mutate(L_adj = -eta * L)
+```
+
+
+```{r}
+# Summary statistics for both and seasonal variation (plot)
+
+df %>% gather(L, L_adj, key = Type, value = Lerner_index) %>%
+  ggplot(aes(x = time, y = Lerner_index, color = Type)) +
+  geom_line() +
+  theme_economist() + scale_colour_economist() +
+  labs(title = "Firms have a mark up, yet the market is rather competitive",
+       y = "Lerner index", x = "Year")
+
+
+```
+
+
+```{r}
+quarterly_table <- df %>% group_by(q1, q2, q3, q4) %>% 
+  summarize("mean unadjusted" = mean(L),
+            "mean adjusted" = mean(L_adj),
+            "std unadjusted" = sqrt(var(L)),
+            "std adjusted" = sqrt(var(L_adj))) %>%
+  mutate(quarter = case_when(
+    q1 == 1 ~ "Q1",
+    q2 == 1 ~ "Q2",
+    q3 == 1 ~ "Q3",
+    q4 == 1 ~ "Q4")) %>%
+  as_tibble()
+
+quarterly_table <- quarterly_table %>% select(-q1, -q2, -q3, -q4) %>%
+  select(quarter, everything()) %>%
+  arrange(quarter)
+quarterly_table
+```
+
+## Conduct parameter
+Estimate for the entire period
+$P = \frac{\eta c}{\eta - \lambda}$
+$P = b*c$, estimate $\hat{b}$ from a regression and solve for lambda:
+
+$\hat{b} = \frac{\eta}{\eta - \hat{\lambda}}$
+
+We estimate the following regression: $P_{coffee} = b* cost + \beta' Q$
+where $Q$ is a vector of four quarterly dummies (including all four because we don't include any intercept).
+```{r}
+no_dummies <- lm(cprice ~ c + 0, data = df) # plus 0 for no intercept
+q_dummies <- lm(cprice ~ c + 0 + q1 + q2 + q3 + q4, data = df) # add controls
+# obtain estimate of b
+b <- no_dummies$coefficients[1]
+```
+
+We obtain the following estimate for $b$: `r round(b, 2)` which we use to plug into the following formula: $\lambda = \frac{\hat{\eta}(\hat{b}-1)}{\hat{b}}$
+```{r}
+lambda = -eta * (b-1)/b
+```
+
+We estimate $\lambda$ to be equal to `r round(lambda,2)`, which means the market is composed of $\frac{1}{lambda} = $ `r round(1/lambda,2)` equally sized firms.
+
+
+
