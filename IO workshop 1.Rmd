@@ -1,0 +1,124 @@
+---
+title: "IO Workshop1"
+author: "Chris Hayes"
+date: "2 April 2019"
+output:
+  html_document:
+    theme: readable
+    df_print: kable
+    highlight: zenburn
+    code_folding: hide
+
+---
+
+
+```{r message=FALSE, result="hide"}
+library("Ecdat")
+library("tidyverse")
+library("rio")
+library("rvest")
+library("httr")
+library("magrittr")
+library("stringr")
+library("glue")
+library("broom")
+library("ggplot2")
+library("ggthemes")
+library("stargazer")
+library("foreign")
+library("ivpack")
+setwd("C:/Users/chris/Dropbox/02 SSE/5321 IO/Empirical workshops")
+
+df <- import("dutch_coffee.dta") %>% as.data.frame() #Import data
+df %<>% mutate(t = as.numeric(rownames(df))) #Add time var
+df %<>% mutate(time = year + month/12) #Add time var in form of continuous year variable
+#Index prices to 1st month
+df %<>% mutate(ind.coffee = cprice/cprice[1]*100,
+               ind.tea = tprice/tprice[1]*100,
+               ind.wages = wprice/wprice[1]*100,
+               ind.beans = bprice/bprice[1]*100,
+               ind.pc.cons = qu/qu[1]*100,
+               ind.pc.inc = incom/incom[1]*100)
+#Create real vars
+df %<>% mutate(coffee = cprice/oprice,
+               tea = tprice/oprice,
+               wages = wprice/oprice,
+               beans = bprice/oprice,
+               pc.cons = qu/oprice,
+               pc.inc = incom/oprice)
+#Create factor variable for season
+df %<>% mutate(season = case_when(
+  q1==1 ~ 1,
+  q2==1 ~ 2,
+  q3==1 ~ 3,
+  q4==4 ~ 4))
+df$season %<>% as.factor()
+df %>% count(season)
+```
+
+1) Present and discuss summary statistics of the data. Show and describe the following relationships: (a) per capita consumption of roasted cofee and the price of roasted coffee, (b) consumption of roasted coffee and price of tea, (c) price of roasted coffee and price of labor, (d) price of roasted coffee and price of tea. `Comment if you observe any clear time trends.
+
+```{r}
+#sapply(select(df$cprice, df$bprice, df$tprice, df$wprice, df$oprice, df$income), summary)
+df %>% gather(coffee, tea, wages, pc.cons, key = 'index', value = 'price') %>% ggplot(aes(x = time, y = price, col=index)) + geom_line() + theme_wsj() + scale_color_wsj()
+```
+
+```{r}
+cor(df$qu, df$cprice)
+cor(df$qu, df$tprice)
+cor(df$cprice, df$wprice)
+cor(df$cprice, df$tprice)
+```
+
+
+2) Regress log of per capita consumption of roasted coffee on the log of price of roasted coffee. Interpret and discuss the coefficient of price. Is it econom- ically meaningful? Is it reliable?
+
+```{r, results="asis"}
+reg2 <- lm(log(pc.cons) ~ log(coffee), data = df)
+reg2cont <- lm(log(pc.cons) ~ log(coffee) + q1 + q2 + q3 + q4, data = df)
+
+```
+
+3) List and discuss factors that shift demand for coffee. List and discuss factors that shift supply for coffee.
+
+The coffee demand curve will be shifted by substitute prices (tea) and consumer income.
+
+The coffee supply curve will be shifted by input prices (beans and labour) and season.
+
+4) Use a log-linear model to estimate demand. Add the price of tea and income s additional covariates and re-estimate your model. What do you account or now as compared to the specification you used in 2)?
+
+```{r, results="asis"}
+reg4a <- lm(log(pc.cons) ~ log(pc.inc) +  q1 + q2 + q3, data = df)
+reg4b <- lm(log(pc.cons) ~ log(pc.inc) + log(tea) + log(wages) + log(beans) + q1 + q2 + q3, data = df)
+stargazer(reg2, reg2cont, reg4a, reg4b, 
+          omit=c("q1", "q2", "q3"), 
+          type="html", header=FALSE)
+
+```
+
+5) There is still at least one major concern that you need to handle in the demand estimation. What is that? Propose a solution. Implement your suggested solution given the data at hand. Exactly what assumptions do you rely on? Interpret your results. What can you tell about the magnitude of the price elasticity of demand?
+
+```{r}
+#ivreg(ln_qu ~ ln_cprice + ln_tprice + q1 + q2 + q3 |ln_wprice)
+#ivreg(formula, instruments, data, subset, na.action, weights, offset, contrasts = NULL, model = TRUE, y = TRUE, x = FALSE, …)
+```
+
+$\beta * c$
+6) 
+
+```{r}
+c0=4
+c0
+h=1.19
+h
+df %<>% mutate(cost = c0 + h * bprice,
+               ln_cost = log(cost))
+```
+
+
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
