@@ -27,7 +27,7 @@ library("ggthemes")
 library("stargazer")
 library("foreign")
 library("ivpack")
-setwd("C:/Users/chris/Dropbox/02 SSE/5321 IO/Empirical workshops")
+setwd("C:/Users/chris/OneDrive/Documents/Personal misc/SSE/5309 IO/5309-IO")
 
 df <- import("dutch_coffee.dta") %>% as.data.frame() #Import data
 df %<>% mutate(t = as.numeric(rownames(df))) #Add time var
